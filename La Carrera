@@ -1,0 +1,904 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>La Carrera — Multiplicación de Matrices</title>
+<link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300;1,400&family=JetBrains+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<style>
+:root {
+  --bg:       #0e0f13;
+  --surface:  #15171f;
+  --surface2: #1c1f2b;
+  --surface3: #232838;
+  --border:   #2a2d3a;
+  --chalk:    #e8e4d8;
+  --dim:      #8a8577;
+  --faint:    #3a3830;
+
+  --gold:     #f0c040;
+  --gold2:    #f5d070;
+  --teal:     #6de0b0;
+  --red:      #f07060;
+  --blue:     #70b8f0;
+
+  --row-color: #70b8f0;   /* blue for rows */
+  --col-color: #e8a070;   /* orange for columns */
+  --cell-color: #c084fc;  /* purple for result cells */
+
+  --font-math: 'Crimson Pro', Georgia, serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+  width: 100%; min-height: 100vh;
+  background: var(--bg); color: var(--chalk);
+  font-family: var(--font-math);
+  overflow-x: hidden;
+}
+button { cursor: pointer; border: none; background: none; font-family: inherit; color: inherit; }
+input { font-family: var(--font-mono); }
+
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events: none; z-index: 9999; opacity: 0.6;
+}
+
+.screen { display: none; min-height: 100vh; }
+.screen.active { display: flex; flex-direction: column; }
+
+/* ══════════════════════════════
+   INTRO
+══════════════════════════════ */
+#screen-intro {
+  align-items: center; justify-content: center;
+  padding: 40px 20px;
+  background: radial-gradient(ellipse at 50% 25%, #1a1d28 0%, var(--bg) 70%);
+}
+.intro-wrap { max-width: 640px; width: 100%; }
+
+.game-title {
+  text-align: center; font-weight: 300;
+  font-size: clamp(2.2rem, 6vw, 3.6rem);
+  letter-spacing: 0.05em; margin-bottom: 6px;
+  line-height: 1.15;
+}
+.game-title .t-la { color: var(--dim); }
+.game-title .t-carrera { color: var(--gold); font-style: italic; }
+.game-sub {
+  text-align: center; color: var(--dim);
+  font-size: 0.8rem; text-transform: uppercase;
+  letter-spacing: 0.18em; margin-bottom: 32px;
+}
+
+/* Loom diagram preview */
+.loom-preview {
+  display: flex; justify-content: center; margin-bottom: 28px;
+}
+.loom-svg { max-width: 380px; width: 100%; }
+
+.intro-grid {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 14px; margin-bottom: 24px;
+}
+.intro-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px; padding: 16px 18px;
+}
+.intro-card.full { grid-column: 1/-1; }
+.ic-title {
+  font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.12em;
+  color: var(--gold); margin-bottom: 8px; font-family: var(--font-mono);
+}
+.ic-body { font-size: 0.9rem; color: var(--dim); line-height: 1.65; }
+.ic-body b { color: var(--chalk); font-weight: 500; }
+.ic-body .row-tag { color: var(--row-color); font-weight: 500; }
+.ic-body .col-tag { color: var(--col-color); font-weight: 500; }
+
+.score-table {
+  width: 100%; border-collapse: collapse;
+  font-size: 0.85rem; margin-top: 4px;
+}
+.score-table td { padding: 4px 8px; color: var(--dim); }
+.score-table td:first-child { color: var(--chalk); }
+.score-table td:last-child { text-align: right; font-family: var(--font-mono); color: var(--teal); }
+
+.btn-start {
+  width: 100%; padding: 16px;
+  background: linear-gradient(135deg, #2a2510, #34301a);
+  border: 1px solid var(--gold);
+  border-radius: 10px; color: var(--gold);
+  font-size: 1.1rem; letter-spacing: 0.08em;
+  transition: all 0.2s;
+  box-shadow: 0 0 24px rgba(240,192,64,0.08);
+}
+.btn-start:hover {
+  background: linear-gradient(135deg, #34301a, #3c3620);
+  box-shadow: 0 0 32px rgba(240,192,64,0.16);
+  transform: translateY(-1px);
+}
+
+/* ══════════════════════════════
+   GAME SCREEN
+══════════════════════════════ */
+#screen-game {
+  height: 100vh; max-height: 100vh; overflow: hidden;
+}
+.game-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 20px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.gh-title { font-size: 1.05rem; font-weight: 300; letter-spacing: 0.06em; }
+.gh-title .t-gold { color: var(--gold); font-style: italic; }
+.gh-stats { display: flex; gap: 18px; align-items: center; }
+.stat-block { text-align: center; }
+.stat-label {
+  font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.1em;
+  color: var(--dim); font-family: var(--font-mono); margin-bottom: 2px;
+}
+.stat-value {
+  font-size: 1.15rem; font-family: var(--font-mono);
+  color: var(--chalk); font-weight: 500;
+}
+.stat-value.timer { color: var(--gold); }
+.stat-value.timer.urgent { color: var(--red); animation: pulse-red 0.6s ease-in-out infinite alternate; }
+@keyframes pulse-red { from { opacity:1; } to { opacity:0.5; } }
+.stat-value.score { color: var(--teal); }
+
+.hbtn {
+  padding: 6px 14px; border: 1px solid var(--border);
+  border-radius: 6px; font-size: 0.78rem; color: var(--dim);
+  background: var(--surface2); letter-spacing: 0.05em;
+  transition: all 0.15s;
+}
+.hbtn:hover { color: var(--chalk); border-color: var(--dim); }
+
+/* Game body */
+.game-body {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  padding: 20px; gap: 24px;
+  overflow: hidden;
+  position: relative;
+}
+
+.phase-label {
+  font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.16em;
+  color: var(--dim); font-family: var(--font-mono);
+  text-align: center; min-height: 1.4em;
+  transition: color 0.3s;
+}
+.phase-label.row-phase { color: var(--row-color); }
+.phase-label.col-phase { color: var(--col-color); }
+.phase-label.val-phase { color: var(--cell-color); }
+
+/* Matrices layout */
+.matrices-row {
+  display: flex; align-items: center; justify-content: center;
+  gap: 28px; flex-wrap: nowrap;
+}
+.matrix-block { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.matrix-name {
+  font-size: 1rem; font-style: italic; color: var(--dim);
+  font-family: var(--font-math);
+}
+.matrix-name .dim { font-size: 0.7rem; font-style: normal; color: var(--faint); font-family: var(--font-mono); margin-left: 4px; }
+
+.matrix-grid {
+  display: inline-grid;
+  gap: 3px;
+  padding: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  position: relative;
+}
+.matrix-bracket {
+  position: absolute; top: 6px; bottom: 6px;
+  width: 8px;
+  border: 2px solid var(--faint);
+}
+.matrix-bracket.left  { left: 0; border-right: none; border-radius: 4px 0 0 4px; }
+.matrix-bracket.right { right: 0; border-left: none; border-radius: 0 4px 4px 0; }
+
+.mcell {
+  width: 52px; height: 52px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 1.15rem; font-family: var(--font-mono);
+  color: var(--chalk);
+  transition: background 0.15s, border-color 0.15s, transform 0.1s;
+  position: relative;
+}
+.mcell.empty { color: var(--faint); }
+.mcell.clickable { cursor: pointer; }
+
+/* Row/col highlight states */
+.mcell.row-hover  { background: rgba(112,184,240,0.18); border-color: var(--row-color); }
+.mcell.row-locked { background: rgba(112,184,240,0.28); border-color: var(--row-color); box-shadow: 0 0 10px rgba(112,184,240,0.3); }
+.mcell.col-hover  { background: rgba(232,160,112,0.18); border-color: var(--col-color); }
+.mcell.col-locked { background: rgba(232,160,112,0.28); border-color: var(--col-color); box-shadow: 0 0 10px rgba(232,160,112,0.3); }
+
+/* Target cell in result matrix */
+.mcell.target {
+  border-color: var(--cell-color);
+  box-shadow: 0 0 0 2px rgba(192,132,252,0.3);
+  animation: target-pulse 1.2s ease-in-out infinite;
+}
+@keyframes target-pulse {
+  0%, 100% { box-shadow: 0 0 0 2px rgba(192,132,252,0.2); }
+  50%      { box-shadow: 0 0 0 4px rgba(192,132,252,0.45); }
+}
+.mcell.target input {
+  width: 100%; height: 100%;
+  background: transparent; border: none; outline: none;
+  color: var(--cell-color); font-size: 1.15rem; font-family: var(--font-mono);
+  text-align: center;
+}
+.mcell.filled { background: rgba(192,132,252,0.1); border-color: var(--cell-color); color: var(--cell-color); }
+
+/* Shake / error feedback */
+.mcell.shake { animation: shake 0.4s ease; background: rgba(240,112,96,0.25) !important; border-color: var(--red) !important; }
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-6px); }
+  40% { transform: translateX(5px); }
+  60% { transform: translateX(-4px); }
+  80% { transform: translateX(3px); }
+}
+
+/* Success flash */
+.mcell.success { animation: success-flash 0.5s ease; }
+@keyframes success-flash {
+  0% { background: rgba(110,224,176,0.4); }
+  100% { background: rgba(192,132,252,0.1); }
+}
+
+/* Connecting line (× symbol between matrices) */
+.op-symbol {
+  font-size: 2rem; color: var(--dim); font-weight: 300;
+  align-self: center;
+}
+
+/* Floating points popup */
+.points-popup {
+  position: fixed; font-family: var(--font-mono); font-weight: 600;
+  font-size: 1.2rem; pointer-events: none; z-index: 50;
+  opacity: 0;
+}
+.points-popup.positive { color: var(--teal); }
+.points-popup.negative { color: var(--red); }
+
+/* Toast */
+.toast {
+  position: fixed; top: 70px; left: 50%;
+  transform: translateX(-50%) translateY(-60px);
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 8px; padding: 8px 20px;
+  font-size: 0.85rem; color: var(--chalk);
+  letter-spacing: 0.05em; z-index: 200;
+  pointer-events: none; white-space: nowrap;
+  transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1);
+}
+.toast.show { transform: translateX(-50%) translateY(0); }
+
+/* ══════════════════════════════
+   RESULTS SCREEN
+══════════════════════════════ */
+#screen-results {
+  align-items: center; justify-content: center;
+  padding: 40px 20px;
+  background: radial-gradient(ellipse at 50% 30%, #1a1d28 0%, var(--bg) 70%);
+}
+.results-wrap { max-width: 480px; width: 100%; text-align: center; }
+.results-icon { font-size: 2.6rem; margin-bottom: 8px; }
+.results-title {
+  font-size: 2.2rem; font-weight: 300; letter-spacing: 0.06em;
+  margin-bottom: 6px;
+}
+.results-title span { color: var(--gold); font-style: italic; }
+.results-score {
+  font-size: 3rem; color: var(--teal); font-family: var(--font-mono);
+  font-weight: 600; margin: 14px 0;
+}
+.results-grid {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 10px; margin: 20px 0 28px;
+}
+.result-stat {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; padding: 14px;
+}
+.result-stat .rs-label {
+  font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.1em;
+  color: var(--dim); font-family: var(--font-mono); margin-bottom: 6px;
+}
+.result-stat .rs-value {
+  font-size: 1.4rem; font-family: var(--font-mono); color: var(--chalk);
+}
+.results-btns { display: flex; gap: 12px; justify-content: center; }
+.results-btn {
+  padding: 12px 28px; border: 1px solid var(--border);
+  border-radius: 8px; font-size: 1rem; color: var(--chalk);
+  background: var(--surface); transition: all 0.2s;
+}
+.results-btn:hover { background: var(--surface2); border-color: var(--dim); }
+.results-btn.primary {
+  background: var(--gold); color: var(--bg);
+  border-color: var(--gold); font-weight: 600;
+}
+.results-btn.primary:hover { background: var(--gold2); }
+</style>
+</head>
+<body>
+
+<!-- ══════════════ INTRO ══════════════ -->
+<div id="screen-intro" class="screen active">
+  <div class="intro-wrap">
+    <h1 class="game-title"><span class="t-la">La </span><span class="t-cadena">Cadena</span></h1>
+    <p class="game-sub">Multiplicación de matrices contrarreloj</p>
+
+    <div class="loom-preview">
+      <svg class="loom-svg" viewBox="0 0 380 140" xmlns="http://www.w3.org/2000/svg">
+        <!-- Row from A -->
+        <rect x="10" y="40" width="100" height="20" rx="3" fill="none" stroke="#70b8f0" stroke-width="2"/>
+        <text x="60" y="54" text-anchor="middle" fill="#70b8f0" font-family="JetBrains Mono" font-size="11">fila i de A</text>
+        <!-- Column from B -->
+        <rect x="160" y="10" width="20" height="100" rx="3" fill="none" stroke="#e8a070" stroke-width="2"/>
+        <text x="170" y="125" text-anchor="middle" fill="#e8a070" font-family="JetBrains Mono" font-size="11" transform="rotate(0 170 125)">columna j de B</text>
+        <!-- Arrow -->
+        <path d="M 120 50 L 150 50" stroke="#8a8577" stroke-width="1.5" marker-end="url(#arrow)" fill="none"/>
+        <path d="M 190 50 L 220 50" stroke="#8a8577" stroke-width="1.5" marker-end="url(#arrow)" fill="none"/>
+        <defs>
+          <marker id="arrow" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto">
+            <path d="M0,0 L8,4 L0,8 Z" fill="#8a8577"/>
+          </marker>
+        </defs>
+        <!-- Result cell -->
+        <rect x="230" y="40" width="40" height="20" rx="3" fill="none" stroke="#c084fc" stroke-width="2.5"/>
+        <text x="250" y="54" text-anchor="middle" fill="#c084fc" font-family="JetBrains Mono" font-size="13" font-weight="600">Cᵢⱼ</text>
+        <text x="300" y="54" text-anchor="middle" fill="#3a3830" font-family="Crimson Pro" font-size="13" font-style="italic">= producto</text>
+      </svg>
+    </div>
+
+    <div class="intro-grid">
+      <div class="intro-card">
+        <div class="ic-title">Cómo se juega</div>
+        <div class="ic-body">
+          Se resalta una celda <b>C<sub>ij</sub></b> vacía. Primero selecciona la
+          <span class="row-tag">fila i</span> de A pasando el cursor y haciendo click.
+          Luego la <span class="col-tag">columna j</span> de B del mismo modo.
+          Finalmente escribe el valor numérico de esa celda.
+        </div>
+      </div>
+      <div class="intro-card">
+        <div class="ic-title">Si te equivocas</div>
+        <div class="ic-body">
+          La celda hace <b>shake en rojo</b> — sin pistas. Vuelve a intentar,
+          pero ganarás menos puntos. No hay límite de intentos, solo el reloj.
+        </div>
+      </div>
+      <div class="intro-card full">
+        <div class="ic-title">Puntuación</div>
+        <table class="score-table">
+          <tr><td>Fila correcta (1er intento)</td><td>+10 pts</td></tr>
+          <tr><td>Columna correcta (1er intento)</td><td>+10 pts</td></tr>
+          <tr><td>Valor correcto (1er intento)</td><td>+25 pts</td></tr>
+          <tr><td>Cada error adicional</td><td>−5 pts</td></tr>
+          <tr><td>Bonus de velocidad (celda &lt; 8s)</td><td>hasta +15 pts</td></tr>
+          <tr><td>Matriz completa</td><td>+20 pts extra</td></tr>
+        </table>
+      </div>
+      <div class="intro-card full">
+        <div class="ic-title">Progresión</div>
+        <div class="ic-body">
+          Empiezas con matrices <b>2×2</b>. Cada <b>3 matrices completadas</b>
+          el tamaño crece — 2×3, 3×3, 3×4... más celdas, más sumas, más puntos en juego.
+        </div>
+      </div>
+    </div>
+
+    <button class="btn-start" onclick="startGame()">⏱ Comenzar — 3:00</button>
+  </div>
+</div>
+
+<!-- ══════════════ GAME ══════════════ -->
+<div id="screen-game" class="screen">
+  <div class="game-header">
+    <span class="gh-title"><span class="t-gold">La</span> Carrera</span>
+    <div class="gh-stats">
+      <div class="stat-block">
+        <div class="stat-label">Tiempo</div>
+        <div class="stat-value timer" id="stat-timer">3:00</div>
+      </div>
+      <div class="stat-block">
+        <div class="stat-label">Puntos</div>
+        <div class="stat-value score" id="stat-score">0</div>
+      </div>
+      <div class="stat-block">
+        <div class="stat-label">Matrices</div>
+        <div class="stat-value" id="stat-matrices">0</div>
+      </div>
+      <div class="stat-block">
+        <div class="stat-label">Errores</div>
+        <div class="stat-value" id="stat-errors">0</div>
+      </div>
+    </div>
+    <button class="hbtn" onclick="confirmQuit()">Terminar</button>
+  </div>
+
+  <div class="game-body">
+    <div class="phase-label" id="phase-label">Selecciona la fila de A</div>
+    <div class="matrices-row" id="matrices-row"></div>
+  </div>
+</div>
+
+<!-- ══════════════ RESULTS ══════════════ -->
+<div id="screen-results" class="screen">
+  <div class="results-wrap">
+    <div class="results-icon">🏁</div>
+    <h2 class="results-title">¡Tiempo <span>agotado</span>!</h2>
+    <div class="results-score" id="rs-score">0</div>
+    <div class="results-grid">
+      <div class="result-stat"><div class="rs-label">Matrices completas</div><div class="rs-value" id="rs-matrices">0</div></div>
+      <div class="result-stat"><div class="rs-label">Celdas correctas</div><div class="rs-value" id="rs-cells">0</div></div>
+      <div class="result-stat"><div class="rs-label">Errores totales</div><div class="rs-value" id="rs-errors">0</div></div>
+      <div class="result-stat"><div class="rs-label">Tiempo prom./celda</div><div class="rs-value" id="rs-avgtime">0s</div></div>
+    </div>
+    <div class="results-btns">
+      <button class="results-btn primary" onclick="startGame()">Jugar de nuevo →</button>
+      <button class="results-btn" onclick="showScreen('intro')">Menú</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+/* ════════════════════════════════════════════════════
+   STATE
+════════════════════════════════════════════════════ */
+const G = {
+  score: 0,
+  matricesCompleted: 0,
+  totalErrors: 0,
+  cellsCompleted: 0,
+  cellTimes: [],       // time taken per cell (seconds)
+  timeLeft: 180,       // 3 minutes
+  timerInterval: null,
+  // current matrices
+  A: null, B: null, C: null, // C is the result, with .values (filled or null) and dims
+  // current cell being worked on
+  target: null,        // {i,j}
+  phase: 'row',         // 'row' | 'col' | 'value'
+  rowErrors: 0, colErrors: 0, valErrors: 0,
+  cellStartTime: 0,
+  selectedRow: null, selectedCol: null,
+  sizeStage: 0,         // increments every 3 matrices, determines dims
+  remainingCells: [],   // shuffled list of {i,j} to fill
+};
+
+const SIZE_PROGRESSION = [
+  [2,2,2], // m=2,n=2,p=2  -> A:2x2 B:2x2 C:2x2
+  [2,3,2], // A:2x3 B:3x2 C:2x2
+  [3,3,3], // A:3x3 B:3x3 C:3x3
+  [3,2,4], // A:3x2 B:2x4 C:3x4
+  [4,3,3], // A:4x3 B:3x3 C:4x3
+  [3,4,4], // A:3x4 B:4x4 C:3x4
+];
+
+/* ════════════════════════════════════════════════════
+   MATRIX GENERATION
+════════════════════════════════════════════════════ */
+function randInt(min, max) { return Math.floor(Math.random()*(max-min+1))+min; }
+
+function genMatrix(rows, cols) {
+  const m = [];
+  for (let i=0;i<rows;i++){
+    const row = [];
+    for (let j=0;j<cols;j++) row.push(randInt(-5,5));
+    m.push(row);
+  }
+  return m;
+}
+
+function matMul(A, B) {
+  const m = A.length, n = A[0].length, p = B[0].length;
+  const C = [];
+  for (let i=0;i<m;i++){
+    const row = [];
+    for (let j=0;j<p;j++){
+      let sum = 0;
+      for (let k=0;k<n;k++) sum += A[i][k]*B[k][j];
+      row.push(sum);
+    }
+    C.push(row);
+  }
+  return C;
+}
+
+function shuffle(arr) {
+  for (let i=arr.length-1;i>0;i--){
+    const j = Math.floor(Math.random()*(i+1));
+    [arr[i],arr[j]]=[arr[j],arr[i]];
+  }
+  return arr;
+}
+
+/* ════════════════════════════════════════════════════
+   GAME FLOW
+════════════════════════════════════════════════════ */
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById('screen-'+id).classList.add('active');
+}
+
+function startGame() {
+  G.score = 0;
+  G.matricesCompleted = 0;
+  G.totalErrors = 0;
+  G.cellsCompleted = 0;
+  G.cellTimes = [];
+  G.timeLeft = 180;
+  G.sizeStage = 0;
+  updateHUD();
+  showScreen('game');
+  newMatrices();
+  if (G.timerInterval) clearInterval(G.timerInterval);
+  G.timerInterval = setInterval(tick, 1000);
+}
+
+function tick() {
+  G.timeLeft--;
+  updateTimer();
+  if (G.timeLeft <= 0) {
+    clearInterval(G.timerInterval);
+    endGame();
+  }
+}
+
+function updateTimer() {
+  const m = Math.floor(G.timeLeft/60);
+  const s = G.timeLeft%60;
+  const el = document.getElementById('stat-timer');
+  el.textContent = `${m}:${s.toString().padStart(2,'0')}`;
+  el.classList.toggle('urgent', G.timeLeft <= 30);
+}
+
+function updateHUD() {
+  document.getElementById('stat-score').textContent = G.score;
+  document.getElementById('stat-matrices').textContent = G.matricesCompleted;
+  document.getElementById('stat-errors').textContent = G.totalErrors;
+  updateTimer();
+}
+
+function confirmQuit() {
+  clearInterval(G.timerInterval);
+  endGame();
+}
+
+function endGame() {
+  clearInterval(G.timerInterval);
+  document.getElementById('rs-score').textContent = G.score;
+  document.getElementById('rs-matrices').textContent = G.matricesCompleted;
+  document.getElementById('rs-cells').textContent = G.cellsCompleted;
+  document.getElementById('rs-errors').textContent = G.totalErrors;
+  const avg = G.cellTimes.length ? (G.cellTimes.reduce((a,b)=>a+b,0)/G.cellTimes.length) : 0;
+  document.getElementById('rs-avgtime').textContent = avg.toFixed(1)+'s';
+  showScreen('results');
+}
+
+/* ════════════════════════════════════════════════════
+   MATRIX SETUP
+════════════════════════════════════════════════════ */
+function newMatrices() {
+  const stageIdx = Math.min(G.sizeStage, SIZE_PROGRESSION.length-1);
+  const [m, n, p] = SIZE_PROGRESSION[stageIdx];
+
+  G.A = genMatrix(m, n);
+  G.B = genMatrix(n, p);
+  const product = matMul(G.A, G.B);
+  G.C = { dims:[m,p], values: Array.from({length:m},()=>Array(p).fill(null)), answers: product };
+
+  // Build shuffled list of all cells to fill
+  G.remainingCells = [];
+  for (let i=0;i<m;i++) for (let j=0;j<p;j++) G.remainingCells.push({i,j});
+  shuffle(G.remainingCells);
+
+  renderMatrices();
+  nextCell();
+}
+
+function nextCell() {
+  if (G.remainingCells.length === 0) {
+    // Matrix complete!
+    G.matricesCompleted++;
+    G.score += 20;
+    updateHUD();
+    showToast('✦ Matriz completa! +20 pts');
+    if (G.matricesCompleted % 3 === 0) G.sizeStage++;
+    setTimeout(newMatrices, 700);
+    return;
+  }
+  G.target = G.remainingCells.shift();
+  G.phase = 'row';
+  G.rowErrors = 0; G.colErrors = 0; G.valErrors = 0;
+  G.selectedRow = null; G.selectedCol = null;
+  G.cellStartTime = Date.now();
+  renderMatrices();
+  updatePhaseLabel();
+}
+
+function updatePhaseLabel() {
+  const el = document.getElementById('phase-label');
+  el.className = 'phase-label';
+  if (G.phase === 'row') {
+    el.textContent = `Selecciona la fila ${G.target.i+1} de A`;
+    el.classList.add('row-phase');
+  } else if (G.phase === 'col') {
+    el.textContent = `Selecciona la columna ${G.target.j+1} de B`;
+    el.classList.add('col-phase');
+  } else {
+    el.textContent = `Calcula C${sub(G.target.i+1)}${sub(G.target.j+1)}`;
+    el.classList.add('val-phase');
+  }
+}
+
+function sub(n) {
+  const subs = '₀₁₂₃₄₅₆₇₈₉';
+  return String(n).split('').map(d=>subs[+d]).join('');
+}
+
+/* ════════════════════════════════════════════════════
+   RENDERING
+════════════════════════════════════════════════════ */
+function renderMatrices() {
+  const wrap = document.getElementById('matrices-row');
+  wrap.innerHTML = '';
+
+  wrap.appendChild(buildMatrixBlock('A', G.A, 'A', null));
+  wrap.appendChild(buildOpSymbol('×'));
+  wrap.appendChild(buildMatrixBlock('B', G.B, 'B', null));
+  wrap.appendChild(buildOpSymbol('='));
+  wrap.appendChild(buildMatrixBlock('C', G.C.values, 'C', G.C));
+}
+
+function buildOpSymbol(sym) {
+  const d = document.createElement('div');
+  d.className = 'op-symbol';
+  d.textContent = sym;
+  return d;
+}
+
+function buildMatrixBlock(label, data, role, cInfo) {
+  const block = document.createElement('div');
+  block.className = 'matrix-block';
+
+  const name = document.createElement('div');
+  name.className = 'matrix-name';
+  const rows = data.length, cols = data[0].length;
+  name.innerHTML = `${label}<span class="dim">${rows}×${cols}</span>`;
+  block.appendChild(name);
+
+  const grid = document.createElement('div');
+  grid.className = 'matrix-grid';
+  grid.style.gridTemplateColumns = `repeat(${cols}, 52px)`;
+  grid.style.gridTemplateRows = `repeat(${rows}, 52px)`;
+
+  const bl = document.createElement('div'); bl.className='matrix-bracket left';
+  const br = document.createElement('div'); br.className='matrix-bracket right';
+  grid.appendChild(bl); grid.appendChild(br);
+
+  for (let i=0;i<rows;i++) {
+    for (let j=0;j<cols;j++) {
+      const cell = document.createElement('div');
+      cell.className = 'mcell';
+      cell.dataset.i = i; cell.dataset.j = j;
+
+      if (role === 'C') {
+        const isTarget = G.target && G.target.i===i && G.target.j===j;
+        const val = cInfo.values[i][j];
+        if (val !== null) {
+          cell.textContent = val;
+          cell.classList.add('filled');
+        } else if (isTarget) {
+          cell.classList.add('target');
+          if (G.phase === 'value') {
+            const inp = document.createElement('input');
+            inp.type = 'text'; inp.inputMode = 'numeric';
+            inp.id = 'value-input';
+            inp.addEventListener('keydown', e => { if (e.key==='Enter') submitValue(); });
+            cell.appendChild(inp);
+          }
+        } else {
+          cell.classList.add('empty');
+          cell.textContent = '·';
+        }
+      } else {
+        cell.textContent = data[i][j];
+        cell.classList.add('clickable');
+
+        if (role === 'A') {
+          cell.addEventListener('mouseenter', () => highlightRow(i, true));
+          cell.addEventListener('mouseleave', () => highlightRow(i, false));
+          cell.addEventListener('click', () => selectRow(i));
+        } else if (role === 'B') {
+          cell.addEventListener('mouseenter', () => highlightCol(j, true));
+          cell.addEventListener('mouseleave', () => highlightCol(j, false));
+          cell.addEventListener('click', () => selectCol(j));
+        }
+
+        // Show locked state if already selected this round
+        if (role==='A' && G.selectedRow===i && (G.phase==='col'||G.phase==='value')) cell.classList.add('row-locked');
+        if (role==='B' && G.selectedCol===j && G.phase==='value') cell.classList.add('col-locked');
+      }
+
+      grid.appendChild(cell);
+    }
+  }
+  block.appendChild(grid);
+
+  // Disable clicking on A once row selected, B until row selected
+  if (role==='A' && G.phase !== 'row') grid.style.pointerEvents = 'none';
+  if (role==='B' && G.phase === 'row') grid.style.pointerEvents = 'none';
+  if (role==='B' && G.phase === 'value') grid.style.pointerEvents = 'none';
+
+  return block;
+}
+
+function highlightRow(i, on) {
+  if (G.phase !== 'row') return;
+  document.querySelectorAll('.matrix-block:nth-child(1) .mcell').forEach(c => {
+    if (+c.dataset.i === i) c.classList.toggle('row-hover', on);
+  });
+}
+function highlightCol(j, on) {
+  if (G.phase !== 'col') return;
+  document.querySelectorAll('.matrix-block:nth-child(3) .mcell').forEach(c => {
+    if (+c.dataset.j === j) c.classList.toggle('col-hover', on);
+  });
+}
+
+/* ════════════════════════════════════════════════════
+   SELECTION LOGIC
+════════════════════════════════════════════════════ */
+function selectRow(i) {
+  if (G.phase !== 'row') return;
+  if (i === G.target.i) {
+    G.selectedRow = i;
+    G.phase = 'col';
+    if (G.rowErrors === 0) awardPoints(10, 'Fila correcta');
+    renderMatrices();
+    updatePhaseLabel();
+  } else {
+    G.rowErrors++;
+    G.totalErrors++;
+    updateHUD();
+    shakeCells('A', c => +c.dataset.i === i);
+  }
+}
+
+function selectCol(j) {
+  if (G.phase !== 'col') return;
+  if (j === G.target.j) {
+    G.selectedCol = j;
+    G.phase = 'value';
+    if (G.colErrors === 0) awardPoints(10, 'Columna correcta');
+    renderMatrices();
+    updatePhaseLabel();
+    setTimeout(() => {
+      const inp = document.getElementById('value-input');
+      if (inp) inp.focus();
+    }, 50);
+  } else {
+    G.colErrors++;
+    G.totalErrors++;
+    updateHUD();
+    shakeCells('B', c => +c.dataset.j === j);
+  }
+}
+
+function shakeCells(role, predicate) {
+  const idx = role === 'A' ? 1 : 3;
+  document.querySelectorAll(`.matrix-block:nth-child(${idx}) .mcell`).forEach(c => {
+    if (predicate(c)) {
+      c.classList.remove('shake');
+      requestAnimationFrame(() => c.classList.add('shake'));
+      setTimeout(() => c.classList.remove('shake'), 400);
+    }
+  });
+}
+
+function submitValue() {
+  const inp = document.getElementById('value-input');
+  if (!inp) return;
+  const val = parseInt(inp.value.trim());
+  const correct = G.C.answers[G.target.i][G.target.j];
+
+  if (isNaN(val)) { return; }
+
+  const cellEl = inp.closest('.mcell');
+
+  if (val === correct) {
+    // Success!
+    const elapsed = (Date.now() - G.cellStartTime) / 1000;
+    G.cellTimes.push(elapsed);
+    G.cellsCompleted++;
+
+    let pts = 0;
+    if (G.valErrors === 0) pts += 25;
+
+    // Speed bonus: up to +15 for cells done under 8s, decaying to 0 at 20s+
+    const speedBonus = Math.max(0, Math.round(15 * (1 - Math.max(0, elapsed-8)/12)));
+    pts += speedBonus;
+
+    G.score += pts;
+    G.C.values[G.target.i][G.target.j] = correct;
+
+    if (cellEl) {
+      cellEl.classList.remove('target');
+      cellEl.innerHTML = correct;
+      cellEl.classList.add('filled', 'success');
+    }
+
+    updateHUD();
+    if (pts > 25) showToast(`+${pts} pts (¡rápido!)`);
+    else showToast(`+${pts} pts`);
+
+    setTimeout(nextCell, 350);
+  } else {
+    G.valErrors++;
+    G.totalErrors++;
+    updateHUD();
+    if (cellEl) {
+      cellEl.classList.remove('shake');
+      requestAnimationFrame(() => cellEl.classList.add('shake'));
+      setTimeout(() => cellEl.classList.remove('shake'), 400);
+    }
+    inp.value = '';
+    inp.focus();
+  }
+}
+
+function awardPoints(pts, label) {
+  G.score += pts;
+  updateHUD();
+}
+
+/* ════════════════════════════════════════════════════
+   TOAST
+════════════════════════════════════════════════════ */
+let toastT;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastT);
+  toastT = setTimeout(() => t.classList.remove('show'), 1600);
+}
+
+/* ════════════════════════════════════════════════════
+   GLOBAL KEY LISTENER for value input (digits, minus, backspace)
+════════════════════════════════════════════════════ */
+document.addEventListener('keydown', e => {
+  if (G.phase === 'value' && document.getElementById('screen-game').classList.contains('active')) {
+    const inp = document.getElementById('value-input');
+    if (inp && document.activeElement !== inp) {
+      if (/[0-9\-]/.test(e.key) || e.key === 'Backspace') {
+        inp.focus();
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>
