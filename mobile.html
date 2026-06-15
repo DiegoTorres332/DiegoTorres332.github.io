@@ -1,0 +1,980 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>La Carrera — Móvil</title>
+<link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300;1,400&family=JetBrains+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:       #0e0f13;
+  --surface:  #15171f;
+  --surface2: #1c1f2b;
+  --surface3: #232838;
+  --border:   #2a2d3a;
+  --chalk:    #e8e4d8;
+  --dim:      #8a8577;
+  --faint:    #3a3830;
+
+  --gold:     #f0c040;
+  --gold2:    #f5d070;
+  --teal:     #6de0b0;
+  --red:      #f07060;
+
+  --row-color: #70b8f0;
+  --col-color: #e8a070;
+  --cell-color: #c084fc;
+
+  --font-math: 'Crimson Pro', Georgia, serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+html, body {
+  width: 100%; height: 100%;
+  background: var(--bg); color: var(--chalk);
+  font-family: var(--font-math);
+  overflow: hidden;
+  touch-action: manipulation;
+}
+button { cursor: pointer; border: none; background: none; font-family: inherit; color: inherit; }
+input { font-family: var(--font-mono); }
+
+/* ══════════════════════════════
+   ORIENTATION GATE
+══════════════════════════════ */
+#rotate-gate {
+  position: fixed; inset: 0; z-index: 500;
+  background: var(--bg);
+  display: none;
+  align-items: center; justify-content: center;
+  flex-direction: column; gap: 16px;
+  text-align: center; padding: 30px;
+}
+@media (orientation: portrait) {
+  #rotate-gate { display: flex; }
+  #app { display: none; }
+}
+.rotate-icon {
+  font-size: 3rem;
+  animation: rotate-hint 1.6s ease-in-out infinite;
+}
+@keyframes rotate-hint {
+  0%, 100% { transform: rotate(0deg); }
+  50% { transform: rotate(-90deg); }
+}
+.rotate-title { font-size: 1.3rem; font-weight: 300; color: var(--gold); font-style: italic; }
+.rotate-text { font-size: 0.9rem; color: var(--dim); max-width: 280px; line-height: 1.6; }
+
+/* ══════════════════════════════
+   APP CONTAINER
+══════════════════════════════ */
+#app { width: 100%; height: 100%; }
+.screen { display: none; width: 100%; height: 100%; flex-direction: column; }
+.screen.active { display: flex; }
+
+/* ══════════════════════════════
+   INTRO
+══════════════════════════════ */
+#screen-intro {
+  align-items: center; justify-content: center;
+  padding: 14px 20px;
+  background: radial-gradient(ellipse at 50% 20%, #1a1d28 0%, var(--bg) 70%);
+  overflow-y: auto;
+}
+.intro-wrap { max-width: 560px; width: 100%; }
+
+.game-title {
+  text-align: center; font-weight: 300;
+  font-size: clamp(1.6rem, 6vw, 2.4rem);
+  letter-spacing: 0.05em; margin-bottom: 2px;
+  line-height: 1.1;
+}
+.game-title .t-la { color: var(--dim); }
+.game-title .t-carrera { color: var(--gold); font-style: italic; }
+.game-sub {
+  text-align: center; color: var(--dim);
+  font-size: 0.65rem; text-transform: uppercase;
+  letter-spacing: 0.16em; margin-bottom: 14px;
+}
+
+.intro-grid {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 8px; margin-bottom: 14px;
+}
+.intro-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px; padding: 10px 12px;
+}
+.intro-card.full { grid-column: 1/-1; }
+.ic-title {
+  font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.1em;
+  color: var(--gold); margin-bottom: 5px; font-family: var(--font-mono);
+}
+.ic-body { font-size: 0.78rem; color: var(--dim); line-height: 1.45; }
+.ic-body b { color: var(--chalk); font-weight: 500; }
+.ic-body .row-tag { color: var(--row-color); font-weight: 500; }
+.ic-body .col-tag { color: var(--col-color); font-weight: 500; }
+
+.score-table {
+  width: 100%; border-collapse: collapse;
+  font-size: 0.74rem;
+}
+.score-table td { padding: 2px 4px; color: var(--dim); }
+.score-table td:first-child { color: var(--chalk); }
+.score-table td:last-child { text-align: right; font-family: var(--font-mono); color: var(--teal); }
+
+.btn-start {
+  width: 100%; padding: 14px;
+  background: linear-gradient(135deg, #2a2510, #34301a);
+  border: 1px solid var(--gold);
+  border-radius: 10px; color: var(--gold);
+  font-size: 1rem; letter-spacing: 0.08em;
+  transition: all 0.2s;
+}
+.btn-start:active { background: #3c3620; transform: scale(0.98); }
+
+/* ══════════════════════════════
+   GAME SCREEN
+══════════════════════════════ */
+#screen-game { overflow: hidden; }
+.game-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 6px 12px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.gh-stats { display: flex; gap: 10px; align-items: center; }
+.stat-block { text-align: center; }
+.stat-label {
+  font-size: 0.55rem; text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--dim); font-family: var(--font-mono); margin-bottom: 0px;
+}
+.stat-value {
+  font-size: 0.95rem; font-family: var(--font-mono);
+  color: var(--chalk); font-weight: 500; line-height: 1;
+}
+.stat-value.timer { color: var(--gold); }
+.stat-value.timer.urgent { color: var(--red); animation: pulse-red 0.6s ease-in-out infinite alternate; }
+@keyframes pulse-red { from { opacity:1; } to { opacity:0.5; } }
+.stat-value.score { color: var(--teal); }
+
+.hbtn {
+  padding: 4px 10px; border: 1px solid var(--border);
+  border-radius: 6px; font-size: 0.68rem; color: var(--dim);
+  background: var(--surface2); letter-spacing: 0.03em;
+}
+.hbtn:active { color: var(--chalk); }
+
+/* Game body — landscape split: matrices left, keypad right */
+.game-body {
+  flex: 1; display: flex; flex-direction: row;
+  overflow: hidden; min-height: 0;
+}
+
+.matrices-zone {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  padding: 6px; gap: 8px; min-width: 0; overflow: hidden;
+}
+
+.phase-label {
+  font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.12em;
+  color: var(--dim); font-family: var(--font-mono);
+  text-align: center; min-height: 1.2em;
+  transition: color 0.3s;
+  flex-shrink: 0;
+}
+.phase-label.row-phase { color: var(--row-color); }
+.phase-label.col-phase { color: var(--col-color); }
+.phase-label.val-phase { color: var(--cell-color); }
+
+.matrices-row {
+  display: flex; align-items: center; justify-content: center;
+  gap: 8px; flex-wrap: nowrap; min-height: 0;
+}
+.matrix-block { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.matrix-name {
+  font-size: 0.7rem; font-style: italic; color: var(--dim);
+  font-family: var(--font-math);
+}
+.matrix-name .dim { font-size: 0.55rem; font-style: normal; color: var(--faint); font-family: var(--font-mono); margin-left: 2px; }
+
+.matrix-grid {
+  display: inline-grid;
+  gap: 2px;
+  padding: 7px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  position: relative;
+}
+.matrix-bracket {
+  position: absolute; top: 4px; bottom: 4px;
+  width: 5px;
+  border: 1.5px solid var(--faint);
+}
+.matrix-bracket.left  { left: 0; border-right: none; border-radius: 3px 0 0 3px; }
+.matrix-bracket.right { right: 0; border-left: none; border-radius: 0 3px 3px 0; }
+
+/* Cell size — dynamic via CSS var set per matrix size */
+.mcell {
+  width: var(--cs, 38px); height: var(--cs, 38px);
+  display: flex; align-items: center; justify-content: center;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  font-size: 0.95rem; font-family: var(--font-mono);
+  color: var(--chalk);
+  transition: background 0.12s, border-color 0.12s;
+  position: relative;
+}
+.mcell.empty { color: var(--faint); }
+.mcell.clickable { cursor: pointer; }
+
+.mcell.row-locked { background: rgba(112,184,240,0.28); border-color: var(--row-color); box-shadow: 0 0 8px rgba(112,184,240,0.3); }
+.mcell.col-locked { background: rgba(232,160,112,0.28); border-color: var(--col-color); box-shadow: 0 0 8px rgba(232,160,112,0.3); }
+
+.mcell.target {
+  border-color: var(--cell-color);
+  box-shadow: 0 0 0 2px rgba(192,132,252,0.3);
+  animation: target-pulse 1.2s ease-in-out infinite;
+}
+@keyframes target-pulse {
+  0%, 100% { box-shadow: 0 0 0 2px rgba(192,132,252,0.2); }
+  50%      { box-shadow: 0 0 0 4px rgba(192,132,252,0.45); }
+}
+.mcell.target .target-display {
+  font-size: 0.95rem; color: var(--cell-color); font-family: var(--font-mono);
+}
+.mcell.filled { background: rgba(192,132,252,0.1); border-color: var(--cell-color); color: var(--cell-color); }
+
+.mcell.shake { animation: shake 0.4s ease; background: rgba(240,112,96,0.25) !important; border-color: var(--red) !important; }
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-5px); }
+  40% { transform: translateX(4px); }
+  60% { transform: translateX(-3px); }
+  80% { transform: translateX(2px); }
+}
+.mcell.success { animation: success-flash 0.5s ease; }
+@keyframes success-flash {
+  0% { background: rgba(110,224,176,0.4); }
+  100% { background: rgba(192,132,252,0.1); }
+}
+
+.op-symbol {
+  font-size: 1.3rem; color: var(--dim); font-weight: 300;
+  align-self: center; flex-shrink: 0;
+}
+
+/* ══════════════════════════════
+   KEYPAD ZONE (right side)
+══════════════════════════════ */
+.keypad-zone {
+  width: 168px; flex-shrink: 0;
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  padding: 8px; gap: 6px;
+}
+.keypad-display {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  height: 40px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.3rem; font-family: var(--font-mono);
+  color: var(--cell-color);
+  letter-spacing: 0.05em;
+}
+.keypad-display .ph { color: var(--faint); font-size: 0.85rem; font-style: italic; font-family: var(--font-math); }
+.keypad-display .cursor {
+  display: inline-block; width: 2px; height: 1.1em;
+  background: var(--cell-color); margin-left: 2px;
+  animation: blink 1s step-end infinite;
+}
+@keyframes blink { 50% { opacity: 0; } }
+
+.keypad-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 5px; flex: 1;
+}
+.kp-btn {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface2);
+  color: var(--chalk);
+  font-family: var(--font-math); font-size: 1.1rem;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.1s;
+}
+.kp-btn:active { background: var(--surface3); transform: scale(0.95); }
+.kp-btn.neg { color: var(--red); font-size: 1.3rem; }
+.kp-btn.del { color: var(--dim); font-size: 0.95rem; }
+.kp-btn.confirm {
+  grid-column: span 3;
+  background: var(--cell-color); color: var(--bg);
+  font-weight: 700; font-size: 1.05rem;
+  letter-spacing: 0.04em;
+}
+.kp-btn.confirm:active { background: #d4a8ff; }
+.kp-btn.confirm:disabled {
+  background: var(--surface2); color: var(--faint);
+}
+.kp-btn.zero { grid-column: span 2; }
+
+/* When not in value phase, show idle hint instead of keypad */
+.keypad-idle {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  text-align: center; color: var(--dim); font-size: 0.78rem;
+  font-style: italic; line-height: 1.6; padding: 10px;
+}
+.keypad-idle .kid-icon { font-size: 1.6rem; display:block; margin-bottom: 8px; }
+.keypad-idle.row-active { color: var(--row-color); }
+.keypad-idle.col-active { color: var(--col-color); }
+
+/* Toast */
+.toast {
+  position: fixed; top: 44px; left: 50%;
+  transform: translateX(-50%) translateY(-50px);
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 8px; padding: 6px 16px;
+  font-size: 0.78rem; color: var(--chalk);
+  letter-spacing: 0.04em; z-index: 200;
+  pointer-events: none; white-space: nowrap;
+  transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1);
+}
+.toast.show { transform: translateX(-50%) translateY(0); }
+
+/* ══════════════════════════════
+   RESULTS SCREEN
+══════════════════════════════ */
+#screen-results {
+  align-items: center; justify-content: center;
+  padding: 16px 24px;
+  background: radial-gradient(ellipse at 50% 30%, #1a1d28 0%, var(--bg) 70%);
+  overflow-y: auto;
+}
+.results-wrap { max-width: 460px; width: 100%; text-align: center; }
+.results-icon { font-size: 1.8rem; margin-bottom: 2px; }
+.results-title {
+  font-size: 1.5rem; font-weight: 300; letter-spacing: 0.06em;
+  margin-bottom: 2px;
+}
+.results-title span { color: var(--gold); font-style: italic; }
+.results-score {
+  font-size: 2.2rem; color: var(--teal); font-family: var(--font-mono);
+  font-weight: 600; margin: 6px 0;
+}
+.results-grid {
+  display: grid; grid-template-columns: 1fr 1fr 1fr 1fr;
+  gap: 6px; margin: 10px 0 14px;
+}
+.result-stat {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 8px; padding: 8px 4px;
+}
+.result-stat .rs-label {
+  font-size: 0.55rem; text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--dim); font-family: var(--font-mono); margin-bottom: 3px;
+}
+.result-stat .rs-value {
+  font-size: 1.05rem; font-family: var(--font-mono); color: var(--chalk);
+}
+.results-btns { display: flex; gap: 8px; justify-content: center; }
+.results-btn {
+  padding: 10px 22px; border: 1px solid var(--border);
+  border-radius: 8px; font-size: 0.9rem; color: var(--chalk);
+  background: var(--surface);
+}
+.results-btn:active { background: var(--surface2); }
+.results-btn.primary {
+  background: var(--gold); color: var(--bg);
+  border-color: var(--gold); font-weight: 600;
+}
+</style>
+</head>
+<body>
+
+<!-- Orientation gate -->
+<div id="rotate-gate">
+  <div class="rotate-icon">📱</div>
+  <div class="rotate-title">Gira tu teléfono</div>
+  <div class="rotate-text">La Carrera está diseñada para jugarse en horizontal. Rota tu dispositivo para continuar.</div>
+</div>
+
+<div id="app">
+<!-- ══════════════ INTRO ══════════════ -->
+<div id="screen-intro" class="screen active">
+  <div class="intro-wrap">
+    <h1 class="game-title"><span class="t-la">La </span><span class="t-carrera">Carrera</span></h1>
+    <p class="game-sub">Multiplicación de matrices · contrarreloj</p>
+
+    <div class="intro-grid">
+      <div class="intro-card">
+        <div class="ic-title">Cómo se juega</div>
+        <div class="ic-body">
+          Toca la <span class="row-tag">fila i</span> de A, luego la
+          <span class="col-tag">columna j</span> de B,
+          y escribe el valor de la celda resaltada en C usando el teclado.
+        </div>
+      </div>
+      <div class="intro-card">
+        <div class="ic-title">Si te equivocas</div>
+        <div class="ic-body">
+          La celda hace <b>shake en rojo</b> — sin pistas. Reintenta,
+          pero ganarás menos puntos. Solo corre el reloj.
+        </div>
+      </div>
+      <div class="intro-card full">
+        <div class="ic-title">Puntuación</div>
+        <table class="score-table">
+          <tr><td>Fila / columna correcta (1er intento)</td><td>+10 c/u</td></tr>
+          <tr><td>Valor correcto (1er intento)</td><td>+25 pts</td></tr>
+          <tr><td>Bonus de velocidad (&lt;8s)</td><td>hasta +15</td></tr>
+          <tr><td>Matriz completa</td><td>+20 pts</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <button class="btn-start" onclick="startGame()">⏱ Comenzar — 3:00</button>
+  </div>
+</div>
+
+<!-- ══════════════ GAME ══════════════ -->
+<div id="screen-game" class="screen">
+  <div class="game-header">
+    <span style="font-size:0.85rem;font-weight:300"><span style="color:var(--gold);font-style:italic">La</span> Carrera</span>
+    <div class="gh-stats">
+      <div class="stat-block">
+        <div class="stat-label">Tiempo</div>
+        <div class="stat-value timer" id="stat-timer">3:00</div>
+      </div>
+      <div class="stat-block">
+        <div class="stat-label">Pts</div>
+        <div class="stat-value score" id="stat-score">0</div>
+      </div>
+      <div class="stat-block">
+        <div class="stat-label">Mat.</div>
+        <div class="stat-value" id="stat-matrices">0</div>
+      </div>
+      <div class="stat-block">
+        <div class="stat-label">Err.</div>
+        <div class="stat-value" id="stat-errors">0</div>
+      </div>
+    </div>
+    <button class="hbtn" onclick="confirmQuit()">Fin</button>
+  </div>
+
+  <div class="game-body">
+    <div class="matrices-zone">
+      <div class="phase-label" id="phase-label">Toca la fila de A</div>
+      <div class="matrices-row" id="matrices-row"></div>
+    </div>
+    <div class="keypad-zone" id="keypad-zone"></div>
+  </div>
+</div>
+
+<!-- ══════════════ RESULTS ══════════════ -->
+<div id="screen-results" class="screen">
+  <div class="results-wrap">
+    <div class="results-icon">🏁</div>
+    <h2 class="results-title">¡Tiempo <span>agotado</span>!</h2>
+    <div class="results-score" id="rs-score">0</div>
+    <div class="results-grid">
+      <div class="result-stat"><div class="rs-label">Matrices</div><div class="rs-value" id="rs-matrices">0</div></div>
+      <div class="result-stat"><div class="rs-label">Celdas</div><div class="rs-value" id="rs-cells">0</div></div>
+      <div class="result-stat"><div class="rs-label">Errores</div><div class="rs-value" id="rs-errors">0</div></div>
+      <div class="result-stat"><div class="rs-label">Prom./celda</div><div class="rs-value" id="rs-avgtime">0s</div></div>
+    </div>
+    <div class="results-btns">
+      <button class="results-btn primary" onclick="startGame()">Jugar de nuevo →</button>
+      <button class="results-btn" onclick="showScreen('intro')">Menú</button>
+    </div>
+  </div>
+</div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+/* ════════════════════════════════════════════════════
+   STATE
+════════════════════════════════════════════════════ */
+const G = {
+  score: 0,
+  matricesCompleted: 0,
+  totalErrors: 0,
+  cellsCompleted: 0,
+  cellTimes: [],
+  timeLeft: 180,
+  timerInterval: null,
+  A: null, B: null, C: null,
+  target: null,
+  phase: 'row',   // 'row' | 'col' | 'value'
+  rowErrors: 0, colErrors: 0, valErrors: 0,
+  cellStartTime: 0,
+  selectedRow: null, selectedCol: null,
+  sizeStage: 0,
+  remainingCells: [],
+  valueStr: '',   // current keypad input as string
+};
+
+const SIZE_PROGRESSION = [
+  [2,2,2],
+  [2,3,2],
+  [3,3,3],
+  [3,2,4],
+  [4,3,3],
+  [3,4,4],
+];
+
+// Cell size per stage so everything fits landscape width
+const CELL_SIZE = [38, 36, 32, 30, 28, 26];
+
+/* ════════════════════════════════════════════════════
+   MATRIX MATH
+════════════════════════════════════════════════════ */
+function randInt(min, max) { return Math.floor(Math.random()*(max-min+1))+min; }
+
+function genMatrix(rows, cols) {
+  const m = [];
+  for (let i=0;i<rows;i++){
+    const row = [];
+    for (let j=0;j<cols;j++) row.push(randInt(-5,5));
+    m.push(row);
+  }
+  return m;
+}
+
+function matMul(A, B) {
+  const m = A.length, n = A[0].length, p = B[0].length;
+  const C = [];
+  for (let i=0;i<m;i++){
+    const row = [];
+    for (let j=0;j<p;j++){
+      let sum = 0;
+      for (let k=0;k<n;k++) sum += A[i][k]*B[k][j];
+      row.push(sum);
+    }
+    C.push(row);
+  }
+  return C;
+}
+
+function shuffle(arr) {
+  for (let i=arr.length-1;i>0;i--){
+    const j = Math.floor(Math.random()*(i+1));
+    [arr[i],arr[j]]=[arr[j],arr[i]];
+  }
+  return arr;
+}
+
+/* ════════════════════════════════════════════════════
+   GAME FLOW
+════════════════════════════════════════════════════ */
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById('screen-'+id).classList.add('active');
+}
+
+function startGame() {
+  G.score = 0;
+  G.matricesCompleted = 0;
+  G.totalErrors = 0;
+  G.cellsCompleted = 0;
+  G.cellTimes = [];
+  G.timeLeft = 180;
+  G.sizeStage = 0;
+  updateHUD();
+  showScreen('game');
+  newMatrices();
+  if (G.timerInterval) clearInterval(G.timerInterval);
+  G.timerInterval = setInterval(tick, 1000);
+}
+
+function tick() {
+  G.timeLeft--;
+  updateTimer();
+  if (G.timeLeft <= 0) {
+    clearInterval(G.timerInterval);
+    endGame();
+  }
+}
+
+function updateTimer() {
+  const m = Math.floor(G.timeLeft/60);
+  const s = G.timeLeft%60;
+  const el = document.getElementById('stat-timer');
+  el.textContent = `${m}:${s.toString().padStart(2,'0')}`;
+  el.classList.toggle('urgent', G.timeLeft <= 30);
+}
+
+function updateHUD() {
+  document.getElementById('stat-score').textContent = G.score;
+  document.getElementById('stat-matrices').textContent = G.matricesCompleted;
+  document.getElementById('stat-errors').textContent = G.totalErrors;
+  updateTimer();
+}
+
+function confirmQuit() {
+  clearInterval(G.timerInterval);
+  endGame();
+}
+
+function endGame() {
+  clearInterval(G.timerInterval);
+  document.getElementById('rs-score').textContent = G.score;
+  document.getElementById('rs-matrices').textContent = G.matricesCompleted;
+  document.getElementById('rs-cells').textContent = G.cellsCompleted;
+  document.getElementById('rs-errors').textContent = G.totalErrors;
+  const avg = G.cellTimes.length ? (G.cellTimes.reduce((a,b)=>a+b,0)/G.cellTimes.length) : 0;
+  document.getElementById('rs-avgtime').textContent = avg.toFixed(1)+'s';
+  showScreen('results');
+}
+
+/* ════════════════════════════════════════════════════
+   MATRIX SETUP
+════════════════════════════════════════════════════ */
+function newMatrices() {
+  const stageIdx = Math.min(G.sizeStage, SIZE_PROGRESSION.length-1);
+  const [m, n, p] = SIZE_PROGRESSION[stageIdx];
+
+  G.A = genMatrix(m, n);
+  G.B = genMatrix(n, p);
+  const product = matMul(G.A, G.B);
+  G.C = { dims:[m,p], values: Array.from({length:m},()=>Array(p).fill(null)), answers: product };
+
+  G.remainingCells = [];
+  for (let i=0;i<m;i++) for (let j=0;j<p;j++) G.remainingCells.push({i,j});
+  shuffle(G.remainingCells);
+
+  renderMatrices();
+  nextCell();
+}
+
+function nextCell() {
+  if (G.remainingCells.length === 0) {
+    G.matricesCompleted++;
+    G.score += 20;
+    updateHUD();
+    showToast('✦ Matriz completa! +20 pts');
+    if (G.matricesCompleted % 3 === 0) G.sizeStage++;
+    setTimeout(newMatrices, 700);
+    return;
+  }
+  G.target = G.remainingCells.shift();
+  G.phase = 'row';
+  G.rowErrors = 0; G.colErrors = 0; G.valErrors = 0;
+  G.selectedRow = null; G.selectedCol = null;
+  G.valueStr = '';
+  G.cellStartTime = Date.now();
+  renderMatrices();
+  renderKeypad();
+  updatePhaseLabel();
+}
+
+function updatePhaseLabel() {
+  const el = document.getElementById('phase-label');
+  el.className = 'phase-label';
+  if (G.phase === 'row') {
+    el.textContent = `Toca la fila ${G.target.i+1} de A`;
+    el.classList.add('row-phase');
+  } else if (G.phase === 'col') {
+    el.textContent = `Toca la columna ${G.target.j+1} de B`;
+    el.classList.add('col-phase');
+  } else {
+    el.textContent = `Calcula C${sub(G.target.i+1)}${sub(G.target.j+1)}`;
+    el.classList.add('val-phase');
+  }
+}
+
+function sub(n) {
+  const subs = '₀₁₂₃₄₅₆₇₈₉';
+  return String(n).split('').map(d=>subs[+d]).join('');
+}
+
+/* ════════════════════════════════════════════════════
+   MATRIX RENDERING (tap-based, no hover)
+════════════════════════════════════════════════════ */
+function renderMatrices() {
+  const wrap = document.getElementById('matrices-row');
+  wrap.innerHTML = '';
+
+  const stageIdx = Math.min(G.sizeStage, CELL_SIZE.length-1);
+  const cellSize = CELL_SIZE[stageIdx];
+
+  wrap.appendChild(buildMatrixBlock('A', G.A, 'A', null, cellSize));
+  wrap.appendChild(buildOpSymbol('×'));
+  wrap.appendChild(buildMatrixBlock('B', G.B, 'B', null, cellSize));
+  wrap.appendChild(buildOpSymbol('='));
+  wrap.appendChild(buildMatrixBlock('C', G.C.values, 'C', G.C, cellSize));
+}
+
+function buildOpSymbol(sym) {
+  const d = document.createElement('div');
+  d.className = 'op-symbol';
+  d.textContent = sym;
+  return d;
+}
+
+function buildMatrixBlock(label, data, role, cInfo, cellSize) {
+  const block = document.createElement('div');
+  block.className = 'matrix-block';
+
+  const name = document.createElement('div');
+  name.className = 'matrix-name';
+  const rows = data.length, cols = data[0].length;
+  name.innerHTML = `${label}<span class="dim">${rows}×${cols}</span>`;
+  block.appendChild(name);
+
+  const grid = document.createElement('div');
+  grid.className = 'matrix-grid';
+  grid.style.setProperty('--cs', cellSize + 'px');
+  grid.style.gridTemplateColumns = `repeat(${cols}, var(--cs))`;
+  grid.style.gridTemplateRows = `repeat(${rows}, var(--cs))`;
+
+  const bl = document.createElement('div'); bl.className='matrix-bracket left';
+  const br = document.createElement('div'); br.className='matrix-bracket right';
+  grid.appendChild(bl); grid.appendChild(br);
+
+  for (let i=0;i<rows;i++) {
+    for (let j=0;j<cols;j++) {
+      const cell = document.createElement('div');
+      cell.className = 'mcell';
+      cell.dataset.i = i; cell.dataset.j = j;
+      cell.style.setProperty('--cs', cellSize + 'px');
+
+      if (role === 'C') {
+        const isTarget = G.target && G.target.i===i && G.target.j===j;
+        const val = cInfo.values[i][j];
+        if (val !== null) {
+          cell.textContent = val;
+          cell.classList.add('filled');
+        } else if (isTarget) {
+          cell.classList.add('target');
+          const span = document.createElement('span');
+          span.className = 'target-display';
+          span.id = 'target-display';
+          span.innerHTML = '<span class="ph">?</span>';
+          cell.appendChild(span);
+        } else {
+          cell.classList.add('empty');
+          cell.textContent = '·';
+        }
+      } else {
+        cell.textContent = data[i][j];
+        cell.classList.add('clickable');
+
+        if (role === 'A') {
+          cell.addEventListener('click', () => selectRow(i));
+          if (G.selectedRow===i && (G.phase==='col'||G.phase==='value')) cell.classList.add('row-locked');
+        } else if (role === 'B') {
+          cell.addEventListener('click', () => selectCol(j));
+          if (G.selectedCol===j && G.phase==='value') cell.classList.add('col-locked');
+        }
+      }
+
+      grid.appendChild(cell);
+    }
+  }
+  block.appendChild(grid);
+
+  if (role==='A' && G.phase !== 'row') grid.style.pointerEvents = 'none';
+  if (role==='B' && G.phase === 'row') grid.style.pointerEvents = 'none';
+  if (role==='B' && G.phase === 'value') grid.style.pointerEvents = 'none';
+
+  return block;
+}
+
+/* ════════════════════════════════════════════════════
+   SELECTION LOGIC (tap to select, no hover preview)
+════════════════════════════════════════════════════ */
+function selectRow(i) {
+  if (G.phase !== 'row') return;
+  if (i === G.target.i) {
+    G.selectedRow = i;
+    G.phase = 'col';
+    if (G.rowErrors === 0) awardPoints(10);
+    renderMatrices();
+    renderKeypad();
+    updatePhaseLabel();
+  } else {
+    G.rowErrors++;
+    G.totalErrors++;
+    updateHUD();
+    shakeCells('A', c => +c.dataset.i === i);
+  }
+}
+
+function selectCol(j) {
+  if (G.phase !== 'col') return;
+  if (j === G.target.j) {
+    G.selectedCol = j;
+    G.phase = 'value';
+    if (G.colErrors === 0) awardPoints(10);
+    renderMatrices();
+    renderKeypad();
+    updatePhaseLabel();
+  } else {
+    G.colErrors++;
+    G.totalErrors++;
+    updateHUD();
+    shakeCells('B', c => +c.dataset.j === j);
+  }
+}
+
+function shakeCells(role, predicate) {
+  const idx = role === 'A' ? 1 : 3;
+  document.querySelectorAll(`.matrix-block:nth-child(${idx}) .mcell`).forEach(c => {
+    if (predicate(c)) {
+      c.classList.remove('shake');
+      requestAnimationFrame(() => c.classList.add('shake'));
+      setTimeout(() => c.classList.remove('shake'), 400);
+    }
+  });
+}
+
+function awardPoints(pts) {
+  G.score += pts;
+  updateHUD();
+}
+
+/* ════════════════════════════════════════════════════
+   KEYPAD (right-side, replaces hidden numeric input)
+════════════════════════════════════════════════════ */
+function renderKeypad() {
+  const zone = document.getElementById('keypad-zone');
+  zone.innerHTML = '';
+
+  if (G.phase !== 'value') {
+    const idle = document.createElement('div');
+    idle.className = 'keypad-idle' + (G.phase==='row' ? ' row-active' : ' col-active');
+    if (G.phase === 'row') {
+      idle.innerHTML = `<span class="kid-icon">①</span>Toca la fila ${G.target.i+1} de la matriz A`;
+    } else {
+      idle.innerHTML = `<span class="kid-icon">②</span>Toca la columna ${G.target.j+1} de la matriz B`;
+    }
+    zone.appendChild(idle);
+    return;
+  }
+
+  // Display
+  const disp = document.createElement('div');
+  disp.className = 'keypad-display';
+  disp.id = 'kp-display';
+  zone.appendChild(disp);
+
+  // Grid
+  const grid = document.createElement('div');
+  grid.className = 'keypad-grid';
+  grid.innerHTML = `
+    <button class="kp-btn" onclick="kpDigit('7')">7</button>
+    <button class="kp-btn" onclick="kpDigit('8')">8</button>
+    <button class="kp-btn" onclick="kpDigit('9')">9</button>
+    <button class="kp-btn" onclick="kpDigit('4')">4</button>
+    <button class="kp-btn" onclick="kpDigit('5')">5</button>
+    <button class="kp-btn" onclick="kpDigit('6')">6</button>
+    <button class="kp-btn" onclick="kpDigit('1')">1</button>
+    <button class="kp-btn" onclick="kpDigit('2')">2</button>
+    <button class="kp-btn" onclick="kpDigit('3')">3</button>
+    <button class="kp-btn neg" onclick="kpNeg()">±</button>
+    <button class="kp-btn zero" onclick="kpDigit('0')">0</button>
+    <button class="kp-btn del" onclick="kpDel()">⌫</button>
+    <button class="kp-btn confirm" id="kp-confirm" onclick="submitValue()" disabled>Confirmar</button>
+  `;
+  zone.appendChild(grid);
+
+  updateKeypadDisplay();
+}
+
+function updateKeypadDisplay() {
+  const disp = document.getElementById('kp-display');
+  const confirm = document.getElementById('kp-confirm');
+  if (!disp) return;
+  if (G.valueStr === '' || G.valueStr === '-') {
+    disp.innerHTML = (G.valueStr === '-' ? '-' : '') + '<span class="ph">valor</span><span class="cursor"></span>';
+  } else {
+    disp.innerHTML = G.valueStr + '<span class="cursor"></span>';
+  }
+  if (confirm) confirm.disabled = (G.valueStr === '' || G.valueStr === '-');
+}
+
+function kpDigit(d) {
+  if (G.valueStr.replace('-','').length >= 3) return;
+  G.valueStr += d;
+  updateKeypadDisplay();
+}
+
+function kpNeg() {
+  G.valueStr = G.valueStr.startsWith('-') ? G.valueStr.slice(1) : '-' + G.valueStr;
+  updateKeypadDisplay();
+}
+
+function kpDel() {
+  G.valueStr = G.valueStr.slice(0, -1);
+  updateKeypadDisplay();
+}
+
+function submitValue() {
+  const val = parseInt(G.valueStr);
+  if (isNaN(val)) return;
+  const correct = G.C.answers[G.target.i][G.target.j];
+
+  const cellEl = document.querySelector('.mcell.target');
+
+  if (val === correct) {
+    const elapsed = (Date.now() - G.cellStartTime) / 1000;
+    G.cellTimes.push(elapsed);
+    G.cellsCompleted++;
+
+    let pts = 0;
+    if (G.valErrors === 0) pts += 25;
+
+    const speedBonus = Math.max(0, Math.round(15 * (1 - Math.max(0, elapsed-8)/12)));
+    pts += speedBonus;
+
+    G.score += pts;
+    G.C.values[G.target.i][G.target.j] = correct;
+
+    if (cellEl) {
+      cellEl.classList.remove('target');
+      cellEl.innerHTML = correct;
+      cellEl.classList.add('filled', 'success');
+    }
+
+    updateHUD();
+    if (pts > 25) showToast(`+${pts} pts (¡rápido!)`);
+    else showToast(`+${pts} pts`);
+
+    setTimeout(nextCell, 350);
+  } else {
+    G.valErrors++;
+    G.totalErrors++;
+    updateHUD();
+    if (cellEl) {
+      cellEl.classList.remove('shake');
+      requestAnimationFrame(() => cellEl.classList.add('shake'));
+      setTimeout(() => cellEl.classList.remove('shake'), 400);
+    }
+    G.valueStr = '';
+    updateKeypadDisplay();
+  }
+}
+
+/* ════════════════════════════════════════════════════
+   TOAST
+════════════════════════════════════════════════════ */
+let toastT;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastT);
+  toastT = setTimeout(() => t.classList.remove('show'), 1400);
+}
+</script>
+</body>
+</html>
